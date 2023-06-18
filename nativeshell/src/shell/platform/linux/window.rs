@@ -39,7 +39,7 @@ use super::{
 
 pub type PlatformWindowType = gtk::Window;
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, Default, PartialEq, Eq, Clone)]
+#[derive(serde::Deserialize, serde::Serialize, Debug, Default, PartialEq, Clone)]
 struct WindowState {
     width: i32,
     height: i32,
