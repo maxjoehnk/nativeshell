@@ -33,6 +33,9 @@ pub struct FlutterOptions<'a> {
     // Name of local engine
     pub local_engine: Option<&'a str>,
 
+    // Name of local engine for host platform
+    pub local_engine_host: Option<&'a str>,
+
     // Source path of local engine. If not specified, NativeShell will try to locate
     // it relative to flutter path.
     pub local_engine_src_path: Option<&'a Path>,
@@ -54,6 +57,7 @@ impl Default for FlutterOptions<'_> {
             target_file: "lib/main.dart".as_path(),
             flutter_path: None,
             local_engine: None,
+            local_engine_host: None,
             local_engine_src_path: None,
             dart_defines: &[],
             macos_extra_pods: &[],
@@ -214,6 +218,8 @@ impl Flutter<'_> {
             &flutter_out_root.join("pubspec.yaml"),
         )?;
 
+        self.set_flutter_root()?;
+        self.remove_rustc_from_env()?;
         self.precache()?;
         self.run_flutter_assemble(&flutter_out_root)?;
         self.emit_flutter_artifacts(&flutter_out_root)?;
@@ -480,6 +486,10 @@ impl Flutter<'_> {
         if let Some(local_engine) = &self.options.local_engine {
             command.arg(format!("--local-engine={local_engine}"));
 
+            if let Some(local_engine_host) = &self.options.local_engine_host {
+                command.arg(format!("--local-engine-host={}", local_engine_host));
+            }
+
             command.arg(format!(
                 "--local-engine-src-path={}",
                 self.options.local_engine_src_path()?.to_slash_lossy()
@@ -588,6 +598,27 @@ impl Flutter<'_> {
             || to.as_ref().into(),
             || from.as_ref().into(),
         )
+    }
+
+    pub fn set_flutter_root(&self) -> BuildResult<()> {
+        if std::env::var("FLUTTER_ROOT").ok().is_some() {
+            return Ok(());
+        }
+        let flutter_bin = self.options.find_flutter_bin()?;
+        let root = flutter_bin.parent().unwrap();
+        // May be required when building plugins.
+        std::env::set_var("FLUTTER_ROOT", root);
+        Ok(())
+    }
+
+    pub fn remove_rustc_from_env(&self) -> BuildResult<()> {
+        let vars = std::env::vars();
+        for (key, _) in vars {
+            if key.starts_with("RUSTC") {
+                std::env::remove_var(&key);
+            }
+        }
+        Ok(())
     }
 
     pub fn precache(&self) -> BuildResult<()> {
