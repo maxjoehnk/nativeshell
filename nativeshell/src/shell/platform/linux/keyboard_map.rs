@@ -22,12 +22,19 @@ pub struct PlatformKeyboardMap {
 
 include!(concat!(env!("OUT_DIR"), "/generated_keyboard_map.rs"));
 
-fn lookup_key(keymap: &Keymap, key: &gdk::KeymapKey) -> Option<i64> {
+struct LookupKey {
+    code: u32,
+    group: u8,
+    level: u8,
+}
+
+fn lookup_key(keymap: &Keymap, key: &LookupKey) -> Option<i64> {
+    let key = get_key(keymap, key.code, key.group, key.level)?;
     // Weird behavior, on SVK keyboard enter returns 'a' and left control returns 'A'.
     if key.keycode() == 36 || key.keycode() == 37 {
         return None;
     }
-    let res = keymap.lookup_key(key)?.to_unicode()? as i64;
+    let res = keymap.lookup_key(&key)?.to_unicode()? as i64;
     if res < 0x20 {
         // ignore control characters
         return None;
@@ -97,7 +104,11 @@ impl PlatformKeyboardMap {
     fn is_ascii(&self, keymap: &Keymap, group: u8, code: u32) -> bool {
         let key = lookup_key(
             keymap,
-            &get_key(&keymap, code, group, 0).unwrap(),
+            &LookupKey {
+                code,
+                group,
+                level: 0,
+            },
         );
         if let Some(key) = key {
             if key < 256 {
@@ -143,13 +154,21 @@ impl PlatformKeyboardMap {
     fn key_from_entry(&self, entry: &KeyMapEntry, keymap: &Keymap, group: u8) -> Key {
         let key = lookup_key(
             keymap,
-            &get_key(&keymap, entry.platform as u32, group, 0).unwrap(),
+            &LookupKey {
+                code: entry.platform as u32,
+                group,
+                level: 0,
+            },
         );
 
         let key_shift = if let Some(_key) = key {
             lookup_key(
                 keymap,
-                &get_key(&keymap, entry.platform as u32, group, 1).unwrap(),
+                &LookupKey {
+                    code: entry.platform as u32,
+                    group,
+                    level: 1,
+                },
             )
         } else {
             None
