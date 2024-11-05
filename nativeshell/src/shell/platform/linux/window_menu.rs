@@ -199,12 +199,7 @@ impl WindowMenu {
         } else {
             menu.menu.popup_at_rect(
                 &window.view.borrow().window().unwrap(),
-                &Rectangle {
-                    x: request.position.x as i32,
-                    y: request.position.y as i32,
-                    width: 0,
-                    height: 0,
-                },
+                &Rectangle::new(request.position.x as i32, request.position.y as i32, 0, 0),
                 Gravity::SouthWest,
                 Gravity::NorthWest,
                 trigger_event,
@@ -269,7 +264,8 @@ impl WindowMenu {
         if current_menu.as_ref() == Some(menu) {
             self.current_menu.borrow_mut().take();
             self.current_request.borrow_mut().take();
-            self.menu_item.set_submenu::<gtk::Menu>(None);
+            let menu: Option<gtk::Menu> = None;
+            self.menu_item.set_submenu(menu.as_ref());
 
             self.menu_bar.hide();
             self.menu_bar.deactivate();

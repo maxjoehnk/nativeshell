@@ -3,7 +3,7 @@ use std::{
     rc::Weak,
 };
 
-use gdk::{Display, Event, EventKey, Keymap};
+use gdk::{Display, Event, EventKey, Keymap, KeymapKey};
 
 use crate::{
     shell::{
@@ -24,7 +24,7 @@ include!(concat!(env!("OUT_DIR"), "/generated_keyboard_map.rs"));
 
 fn lookup_key(keymap: &Keymap, key: &gdk::KeymapKey) -> Option<i64> {
     // Weird behavior, on SVK keyboard enter returns 'a' and left control returns 'A'.
-    if key.keycode == 36 || key.keycode == 37 {
+    if key.keycode() == 36 || key.keycode() == 37 {
         return None;
     }
     let res = keymap.lookup_key(key)?.to_unicode()? as i64;
@@ -33,6 +33,10 @@ fn lookup_key(keymap: &Keymap, key: &gdk::KeymapKey) -> Option<i64> {
         return None;
     }
     Some(res)
+}
+
+fn get_key(keymap: &Keymap, code: u32, group: u8, level: u8) -> Option<KeymapKey> {
+    keymap.entries_for_keyval(code).into_iter().find(|k| k.group() == group as i32 && k.level() == level as i32)
 }
 
 impl PlatformKeyboardMap {
@@ -93,11 +97,7 @@ impl PlatformKeyboardMap {
     fn is_ascii(&self, keymap: &Keymap, group: u8, code: u32) -> bool {
         let key = lookup_key(
             keymap,
-            &gdk::KeymapKey {
-                keycode: code,
-                group: group as _,
-                level: 0,
-            },
+            &get_key(&keymap, code, group, 0).unwrap(),
         );
         if let Some(key) = key {
             if key < 256 {
@@ -143,21 +143,13 @@ impl PlatformKeyboardMap {
     fn key_from_entry(&self, entry: &KeyMapEntry, keymap: &Keymap, group: u8) -> Key {
         let key = lookup_key(
             keymap,
-            &gdk::KeymapKey {
-                keycode: entry.platform as u32,
-                group: group as _,
-                level: 0,
-            },
+            &get_key(&keymap, entry.platform as u32, group, 0).unwrap(),
         );
 
         let key_shift = if let Some(_key) = key {
             lookup_key(
                 keymap,
-                &gdk::KeymapKey {
-                    keycode: entry.platform as u32,
-                    group: group as _,
-                    level: 1,
-                },
+                &get_key(&keymap, entry.platform as u32, group, 1).unwrap(),
             )
         } else {
             None

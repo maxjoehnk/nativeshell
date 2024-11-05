@@ -1,6 +1,7 @@
 use std::{cell::RefCell, rc::Weak};
 
 use gdk::{Display, Monitor, Rectangle};
+use gdk::prelude::MonitorExt;
 use gdk_sys::GdkMonitor;
 use glib::translate::ToGlibPtr;
 
@@ -65,10 +66,10 @@ impl PlatformScreenManager {
 
     fn convert_rect(rect: Rectangle) -> Rect {
         Rect::xywh(
-            rect.x as f64,
-            rect.y as f64,
-            rect.width as f64,
-            rect.height as f64,
+            rect.x() as f64,
+            rect.y() as f64,
+            rect.width() as f64,
+            rect.height() as f64,
         )
     }
 

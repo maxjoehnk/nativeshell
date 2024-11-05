@@ -6,10 +6,10 @@ use std::{
 };
 
 use gdk::{Display, Event, EventType, EventWindowState, WMDecoration, WMFunction};
-use glib::{Cast, ObjectExt};
+use glib::{Cast, ObjectExt, Propagation};
 use gtk::{
     prelude::{ContainerExt, GtkWindowExt, OverlayExt, WidgetExt},
-    propagate_event, EventBox, Inhibit, Overlay, Widget,
+    propagate_event, EventBox, Overlay, Widget,
 };
 
 use crate::{
@@ -140,7 +140,7 @@ impl PlatformWindow {
             if let Some(s) = weak_clone.upgrade() {
                 s.on_window_state_changed(state);
             }
-            Inhibit(false)
+            Propagation::Proceed
         });
 
         self.window.realize();
@@ -162,7 +162,7 @@ impl PlatformWindow {
             if let Some(s) = s {
                 s.on_delete()
             } else {
-                Inhibit(false)
+                Propagation::Proceed
             }
         });
 
@@ -287,7 +287,7 @@ impl PlatformWindow {
                 if let Some(window) = weak.upgrade() {
                     window.drag_context.borrow().drag_failed();
                 }
-                Inhibit(false)
+                Propagation::Proceed
             });
 
             let weak = self.weak_self.borrow().clone();
@@ -299,7 +299,7 @@ impl PlatformWindow {
         }
     }
 
-    fn on_delete(&self) -> Inhibit {
+    fn on_delete(&self) -> Propagation {
         if let Some(delegate) = self.delegate.upgrade() {
             if self.deleting.get() {
                 let callback = self.modal_close_callback.borrow_mut().take();
@@ -307,13 +307,13 @@ impl PlatformWindow {
                     callback(Ok(Value::Null));
                 }
                 delegate.will_close();
-                return Inhibit(false);
+                return Propagation::Proceed;
             } else {
                 delegate.did_request_close();
-                return Inhibit(true);
+                return Propagation::Stop;
             }
         }
-        Inhibit(false)
+        Propagation::Proceed
     }
 
     fn get_event_box(&self) -> Option<EventBox> {
@@ -370,7 +370,7 @@ impl PlatformWindow {
             if let Some(s) = s {
                 s.on_draw();
             }
-            Inhibit(false)
+            Propagation::Proceed
         });
     }
 

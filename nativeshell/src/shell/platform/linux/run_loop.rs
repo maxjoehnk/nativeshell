@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use glib::{source_remove, timeout_add_local, Continue, MainContext, SourceId};
+use glib::{timeout_add_local, ControlFlow, MainContext, SourceId};
 
 pub type HandleType = usize;
 pub const INVALID_HANDLE: HandleType = 0;
@@ -27,7 +27,7 @@ impl PlatformRunLoop {
     pub fn unschedule(&self, handle: HandleType) {
         let source = self.timers.borrow_mut().remove(&handle);
         if let Some(source) = source {
-            source_remove(source);
+            source.remove();
         }
     }
 
@@ -53,7 +53,7 @@ impl PlatformRunLoop {
                 .take()
                 .expect("Timer callback was called multiple times");
             f();
-            Continue(false)
+            ControlFlow::Break
         });
         self.timers.borrow_mut().insert(handle, source_id);
         handle
