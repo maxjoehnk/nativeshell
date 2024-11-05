@@ -25,7 +25,7 @@ mod plugins_impl;
 
 #[derive(Debug)]
 pub(crate) struct PluginPlatformInfo {
-    pub plugin_class: String,
+    pub plugin_class: Option<String>,
     pub platform_directory: PathBuf,
 }
 
@@ -51,18 +51,35 @@ impl<'a> Plugins<'a> {
         }
     }
 
+    fn find_flutter_plugins(&self) -> Option<PathBuf> {
+        let mut dir = Some(self.build.root_dir.clone());
+        loop {
+            if let Some(d) = dir.as_ref() {
+                let flutter_plugins = d.join(".flutter-plugins");
+                if flutter_plugins.exists() {
+                    return Some(flutter_plugins);
+                } else {
+                    dir = d.parent().map(|p| p.into());
+                }
+            } else {
+                return None;
+            }
+        }
+    }
+
     pub fn process(&self) -> BuildResult<()> {
-        let plugins_path = self.build.root_dir.join(".flutter-plugins");
+        let plugins_path = self.find_flutter_plugins();
         let platform = plugins_impl::PluginsImpl::new(self.build, self.artifacts_emitter);
-        let (plugins, plugins_file_content) = if plugins_path.exists() {
-            let plugins_file_content = fs::read_to_string(&plugins_path)
-                .wrap_error(crate::FileOperation::Read, || plugins_path.clone())?;
-            (
-                self.load_plugins(&plugins_file_content)?,
-                plugins_file_content,
-            )
-        } else {
-            (Vec::new(), String::new())
+        let (plugins, plugins_file_content) = match plugins_path {
+            Some(plugins_path) => {
+                let plugins_file_content = fs::read_to_string(&plugins_path)
+                    .wrap_error(crate::FileOperation::Read, || plugins_path.clone())?;
+                (
+                    self.load_plugins(&plugins_file_content)?,
+                    plugins_file_content,
+                )
+            }
+            None => (Vec::new(), String::new()),
         };
 
         let skip_build =
@@ -95,7 +112,7 @@ impl<'a> Plugins<'a> {
         plugin_path: P,
     ) -> BuildResult<HashMap<String, PluginPlatformInfo>> {
         let mut res = HashMap::new();
-
+        println!("PP {:?}", plugin_path.as_ref());
         let path = plugin_path.as_ref().join("pubspec.yaml");
         let pub_spec = fs::read_to_string(&path).wrap_error(FileOperation::Read, || path)?;
         let pub_spec = YamlLoader::load_from_str(&pub_spec)
@@ -109,7 +126,13 @@ impl<'a> Plugins<'a> {
             for platform in platforms {
                 let plugin_class: Option<String> =
                     platform.1["pluginClass"].as_str().map(|s| s.into());
-                if let Some(plugin_class) = plugin_class {
+                let ffi_plugin = platform.1["ffiPlugin"].as_bool().unwrap_or(false);
+                if plugin_class.is_some() || ffi_plugin {
+                    // This was a temporary hack in flutter, but some plugins are
+                    // still using it
+                    if plugin_class.as_deref() == Some("none") {
+                        continue;
+                    }
                     let platform_directory = {
                         let yaml_platform = platform.0.as_str().unwrap();
                         if yaml_platform == "ios" || yaml_platform == "macos" {
@@ -125,17 +148,13 @@ impl<'a> Plugins<'a> {
                             yaml_platform.into()
                         }
                     };
-                    // This was a temporary hack in flutter, but some plugins are
-                    // still using it
-                    if plugin_class != "none" {
-                        res.insert(
-                            platform.0.as_str().unwrap().into(),
-                            PluginPlatformInfo {
-                                plugin_class,
-                                platform_directory,
-                            },
-                        );
-                    }
+                    res.insert(
+                        platform.0.as_str().unwrap().into(),
+                        PluginPlatformInfo {
+                            plugin_class,
+                            platform_directory,
+                        },
+                    );
                 }
             }
         }
