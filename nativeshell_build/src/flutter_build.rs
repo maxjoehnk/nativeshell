@@ -489,9 +489,10 @@ impl Flutter<'_> {
             // the only published action that builds desktop aot is *_bundle_*_assets; it also
             // produces other artifacts (i.e. flutter dll), but we ignore those and handle
             // artifacts on our own
+            // TODO: not sure whether this changes in later flutter versions but in 3.19.6 the bundle name is windows rather than windows-x64
             (TargetOS::Windows, _) => vec![format!(
-                "{}_bundle_{}_assets",
-                self.build_mode, self.target_platform
+                "{}_bundle_windows_assets",
+                self.build_mode //, self.target_platform
             )],
 
             // quicker, no need to copy flutter artifacts, we'll do it ourselves
