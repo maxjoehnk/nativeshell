@@ -213,7 +213,7 @@ impl Flutter<'_> {
 
         let package_config = self.find_package_config()?;
         let package_config_out = flutter_out_dart_tool.join("package_config.json");
-        let package_config_subset = package_config.with_file_name("package_config_subset");
+        let package_graph = package_config.with_file_name("package_graph.json");
 
         if !Path::exists(&package_config) {
             self.do_flutter_pub_get()?;
@@ -242,10 +242,10 @@ impl Flutter<'_> {
         self.update_package_config_paths(package_config, package_config_out, &mut local_roots)?;
 
         Self::copy(
-            &package_config_subset,
+            &package_graph,
             flutter_out_root
                 .join(".dart_tool")
-                .join("package_config_subset"),
+                .join("package_graph.json"),
         )?;
 
         self.set_flutter_root()?;
