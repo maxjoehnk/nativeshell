@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use serde::Deserialize;
 use yaml_rust::YamlLoader;
 
 use crate::{
@@ -55,7 +56,7 @@ impl<'a> Plugins<'a> {
         let mut dir = Some(self.build.root_dir.clone());
         loop {
             if let Some(d) = dir.as_ref() {
-                let flutter_plugins = d.join(".flutter-plugins");
+                let flutter_plugins = d.join(".flutter-plugins-dependencies");
                 if flutter_plugins.exists() {
                     return Some(flutter_plugins);
                 } else {
@@ -162,30 +163,27 @@ impl<'a> Plugins<'a> {
     }
 
     fn load_plugins(&self, file: &str) -> BuildResult<Vec<Plugin>> {
-        let lines = file.split('\n');
-        let lines: Vec<(String, String)> = lines
-            .filter_map(|line| {
-                line.find('=')
-                    .map(|sep| (line[..sep].into(), line[sep + 1..].into()))
-            })
-            .collect();
+        let mut dependencies = serde_json::from_str::<PluginDependencies>(file).map_err(|e| BuildError::JsonError {
+            text: Some(file.to_string()),
+            source: e,
+        })?;
         let mut res = Vec::<Plugin>::new();
-        for item in lines {
-            let mut platform_info = self.load_plugin_info(&item.1)?;
-            let platform_name = match self.build.target_os {
-                TargetOS::Mac => "macos",
-                TargetOS::Windows => "windows",
-                TargetOS::Linux => "linux",
-            };
+        let platform_name = match self.build.target_os {
+            TargetOS::Mac => "macos",
+            TargetOS::Windows => "windows",
+            TargetOS::Linux => "linux",
+        };
+        let plugins = dependencies.plugins.remove(platform_name).unwrap_or_default();
+        for item in plugins {
+            let mut platform_info = self.load_plugin_info(&item.path)?;
             if let Some(platform_info) = platform_info.remove(platform_name) {
-                let path: PathBuf = item.1.into();
-                let platform_path = path.join(&platform_info.platform_directory);
+                let platform_path = item.path.join(&platform_info.platform_directory);
 
                 // some plugins are FFI only, no need to build them
                 if platform_path.exists() {
                     res.push(Plugin {
-                        name: item.0,
-                        path,
+                        name: item.name,
+                        path: item.path,
                         platform_path,
                         platform_info,
                     });
@@ -194,4 +192,15 @@ impl<'a> Plugins<'a> {
         }
         Ok(res)
     }
+}
+
+#[derive(Debug, Deserialize)]
+struct PluginDependencies {
+    plugins: HashMap<String, Vec<PluginSpecification>>
+}
+
+#[derive(Debug, Deserialize)]
+struct PluginSpecification {
+    name: String,
+    path: PathBuf,
 }
